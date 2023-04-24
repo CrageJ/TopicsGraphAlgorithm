@@ -9,7 +9,7 @@ Must python -m pip install:
  * pathlib
 
 # Running the code:
-python script.py [-h] [--simpleRulesV1] [--circular] [--random] inputLocation outputLocation
+python script.py [--simpleRulesV1] [--circular] [--random] inputLocation outputLocation
 
 Where input/output location are the ABSOLUTE file paths.
 Input: path to a folder of inputs
@@ -18,6 +18,8 @@ Output: path to save output
 Each option (--xxx) enables an algorithm to be applied to all inputs.
 Current algorithms developed:
  * simpleRulesV1
+
+-h is also avaliable
 
 Rest are implemented by networkx
 
