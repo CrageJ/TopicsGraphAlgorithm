@@ -4,7 +4,7 @@ repo for adv. topics in computer science
 # Requirements
 Run on python 3.8.5 >=
 Must python -m pip install: 
- * network[default]
+ * networkx[default]
  * matplotlib
  * pathlib
 
