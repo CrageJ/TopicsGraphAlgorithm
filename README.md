@@ -12,8 +12,10 @@ Must python -m pip install:
 python script.py [--simpleRulesV1] [--circular] [--random] inputLocation outputLocation
 
 Where input/output location are the ABSOLUTE file paths.
+
 Input: path to a folder of inputs
-Output: path to save output
+
+Output: path to save output as an image for all algorithms and graphs
 
 Each option (--xxx) enables an algorithm to be applied to all inputs.
 Current algorithms developed:
@@ -21,7 +23,7 @@ Current algorithms developed:
 
 -h is also avaliable
 
-Rest are implemented by networkx
+All other algorithms are implemented by networkx
 
 Do NOT run this inside wsl, as filenames will not be interpreted properly
 
@@ -37,6 +39,7 @@ The first line of the input must be a header.
 # Notes:
 Current iteration of the library dictates that in order for simpleRules to produce an output, all elements of the directed graphs must be reacheable from vertex 0
 
+If output is illegible, you can adjust the node size and edge thickness in options in settings 
 # TODO:
  * Heuristic measurer for how good the solution is
 # TODO ALGORITHMS:
