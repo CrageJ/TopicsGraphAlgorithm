@@ -18,15 +18,18 @@ Output: path to save output
 Each option (--xxx) enables an algorithm to be applied to all inputs.
 Current algorithms developed:
  * simpleRulesV1
+
 Rest are implemented by networkx
 
 Do NOT run this inside wsl, as filenames will not be interpreted properly
 
 Each input file represents a graph, where each file is a csv where each row represents a connection
+
 In that row:
  * Row 1: vertex the connection comes from
  * Row 2: vertex the connection is going to
  * Row 3: type of connection, where 1 represents control and 2 represents data
+
 The first line of the input must be a header.
 
 # Notes:
