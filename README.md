@@ -11,11 +11,11 @@ Must python -m pip install:
 # Running the code:
 python script.py [--simpleRulesV1] [--circular] [--random] inputLocation outputLocation
 
-Where input/output location are the ABSOLUTE file paths.
+Test example: python script.py C:\{InstallFolder}\examples C:\{InstallFolder}\outputs --simpleRulesV1 --circular --random
 
-Input: path to a folder of inputs
+Input: ABSOLUTE path to a folder of inputs
 
-Output: path to save output as an image for all algorithms and graphs
+Output: ABSOLUTE path to save output as an image for all algorithms and graphs
 
 Each option (--xxx) enables an algorithm to be applied to all inputs.
 Current algorithms developed:
