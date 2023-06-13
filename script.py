@@ -8,67 +8,58 @@ import numpy as np
 import networkx as nx
 import time
 
-#call function as
-#script.py examplefilelocation -
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Visualise graphs using multiple graph display algorithms')
 
-    
-    algorithms = (
-        'SimpleRulesV1',
-        'Circular',
-        'Random',
-        'SimpleRulesV2',
-        'SimpleRulesV3'
-    )
+    algorithms = [ #must be the same name as the object name
+        ('SimpleRulesV1','Output simple rule-based graphing algorithm'),
+        ('Circular','Output circular graph'),
+        ('Random', 'Output randomised graph'),
+        ('SimpleRulesV2','Output V2 of simple rules'),
+        ('SimpleRulesV3','Output V3 of simple rules'),
+        ('LevelRankV1','Output V1 of level rank'),
+        ('LevelRankV2','Output V2 of level rank'),
+        ('CombinedRankV1','Output V2 of level rank'),
+    ]
 
-    algorithm_objects = {
-        algorithms[0] : g.SimpleRulesV1(), 
-        algorithms[1] : g.Circular(),
-        algorithms[2] : g.Random(),
-        algorithms[3] : g.SimpleRulesV2(),
-        algorithms[4] : g.SimpleRulesV3()
-    }
-    
-
-    algorithm_switches = [('--'+algorithms[0],  'Output simple rule-based graphing algorithm'), #SimpleRulesV1 
-                          ('--'+algorithms[1], 'Output circular graph'),   #Circular implementation
-                          ('--'+algorithms[2],  'Output randomised graph'), #Random
-                          ('--'+algorithms[3],  'Output V2 of simple rules'),
-                          ('--'+algorithms[4],  'Output V3 of simple rules')]            #SimpleRulesV2
-    
     parser.add_argument('inputLocation',type=str,
                        help='Absolute location of the folder to load examples')
     parser.add_argument('outputLocation',type=str,
                        help='Absolute location of the folder to save output image')
+
+    algorithm_objects = {}
+    algorithm_switches = []
+    algorithm_count = 0
+    algorithm_references = []
+
+    algorithm_index = 0
+    for algorithm in algorithms:
+        algorithm_name = algorithms[algorithm_index][0]
+        algorithm_description = algorithms[algorithm_index][1]
+        #get object of algorithm name
+        exec("algorithm_objects[{}] = g.{}()".format(algorithm_index,algorithm_name),locals())
+        #add as argument to parser
+        exec("parser.add_argument('--'+'{}', help='{}',action='store_true',default=False)".format(algorithm_name,algorithm_description),locals())
+        algorithm_index += 1
+
     
-    for a in algorithm_switches:
-        parser.add_argument(a[0],help=a[1],action='store_true',default=False)
     
     args = parser.parse_args()
 
+
     print(args)
-
-    #count number of args passed
-    algorithm_count =\
-    int(args.SimpleRulesV1) +\
-    int(args.Circular)+\
-    int(args.Random) +\
-    int(args.SimpleRulesV2) +\
-    int(args.SimpleRulesV3)
-
     algorithm_references=[]
 
-    if (args.SimpleRulesV1):
-        algorithm_references.append((algorithm_objects[algorithms[0]],algorithms[0]))
-    if (args.Circular):
-        algorithm_references.append((algorithm_objects[algorithms[1]],algorithms[1]))    
-    if (args.Random):
-        algorithm_references.append((algorithm_objects[algorithms[2]],algorithms[2]))
-    if (args.SimpleRulesV2):
-        algorithm_references.append((algorithm_objects[algorithms[3]],algorithms[3]))
-    if (args.SimpleRulesV3):
-        algorithm_references.append((algorithm_objects[algorithms[4]],algorithms[4]))
+    #count number of args passed
+    algorithm_iterator = 0
+    algorithm_count = 0
+    for algorithm in algorithms:
+        is_algorithm_switch_passed = int(eval("args.{}".format(algorithm[0])))
+        if (is_algorithm_switch_passed):
+            algorithm_references.append((algorithm[0],algorithm_objects[algorithm_iterator])) # (name, object)
+            algorithm_count += 1
+        algorithm_iterator += 1
+
         
 
     folder_location = pathlib.Path(args.inputLocation)
@@ -83,8 +74,7 @@ if __name__ == "__main__":
         file_dirs.append(file) 
         file_count += 1
 
-    print (file_count)
-
+    print ("FileCount:{} AlgoCount:{} FILES:{}".format(file_count,algorithm_count,file_dirs))
 
 
     plot_count = 0
@@ -92,16 +82,18 @@ if __name__ == "__main__":
     plt.autoscale(tight=True)
 
     for file_number in range(file_count):
+        file_dir = file_dirs[file_number]
+        file_name = str(file_dir.stem)
+        file_dir = str(file_dir.resolve())
+
         for algorithm_number in range(algorithm_count):
             plot_count += 1
-            file_dir = file_dirs[file_number]
-            file_name = str(file_dir.stem)
-            file_dir = str(file_dir.resolve())
-            algorithm_name = algorithm_references[algorithm_number][1]
+            ax = plt.subplot(file_count,algorithm_count,plot_count)
+            algorithm_name = algorithm_references[algorithm_number][0]
+            algorithm_object = copy.deepcopy(algorithm_references[algorithm_number][1])
+            positions = {}
+            
             try:
-                ax = plt.subplot(file_count,algorithm_count,plot_count)
-                algorithm_object = copy.deepcopy(algorithm_references[algorithm_number][0])
-                algorithm_name = algorithm_references[algorithm_number][1]
                 algorithm_object.load_file_to_graph(file_dir)
                 positions = algorithm_object.get_position()
                 formatted_graph = algorithm_object.create_formatted_networkx_graph()
@@ -116,7 +108,19 @@ if __name__ == "__main__":
                     "with_labels" : True,
                     "edge_color" : graph_colors
                 }
-                print(positions)
+                #print(positions)
+                a = g.get_crossed_line_count(algorithm_object,positions)
+                b = g.get_line_length_stdev(algorithm_object,positions)
+                c = g.get_average_angles(algorithm_object,positions)
+                print('algorithm_name: {} crossed_line: {} stddev line length : {} average_angle: {}'.format(algorithm_name,a,b,c))
+                # HEURISTIC VALUE CONSTS
+                aa = 0.2
+                bb = 0.4
+                cc = 0.4
+                print('HEURISTIC VALUE WITH ',a,b,c)
+                print (aa*a + bb*b + cc*c)
+
+
                 plt.title(file_name+'//'+algorithm_name)
                 nx.draw(graph, pos=positions,ax=plt.gca(),**options)
             except BaseException as error:
@@ -135,21 +139,3 @@ if __name__ == "__main__":
         plt.show()
     except BaseException as error:
         print("Can't show plot")
-
-
-
-    
-    
-    
-
-
-
-
-
-
-
-
-
-    
-    
-    
