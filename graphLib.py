@@ -7,11 +7,15 @@ import queue
 import pathlib
 import csv
 import numpy
-
+import random
+import statistics
+import math
+import copy
+import array
 
 import networkx as nx
 import matplotlib.pyplot as plt
-
+import shapely
 
 class Vertex(object):
     '''Representing a single vertex of a graph'''
@@ -33,10 +37,14 @@ class Vertex(object):
     # getters and setters. ONLY use these functions
 
     def get_data_connections(self):
-        return [i for i in self.__data_neighbours.values()]
+        r = [i for i in self.__data_neighbours.values()]
+        random.shuffle(r)
+        return r
     
     def get_control_connections(self):
-        return [i for i in self.__control_neighbours.values()]
+        r = [i for i in self.__control_neighbours.values()]
+        random.shuffle(r)
+        return r
     
     def get_connections(self):
         arr = list(self.get_data_connections())
@@ -45,7 +53,7 @@ class Vertex(object):
         for conn in c:
             if conn not in arr:
                 arr.append(conn) 
-
+        random.shuffle(arr)
         return arr # get all keys from all dicts
 
     def get_key(self):
@@ -118,6 +126,8 @@ class Graph(object):
         return '{}'.format(
             [str(vertex) for vertex in self.__vertices]
         )
+    
+
 
 class FormattedParams():
         def __init__(self,graph,color):
@@ -136,7 +146,9 @@ class BehaviourTree(Graph):
     def set_root_vertex_by_key(self,vertex_key): #set vertex by key
         if (self.get_vertex(vertex_key) is None):
             raise Exception("Root vertex does not exist")    
+        
         self.__root_vertex = vertex_key
+
 
     def get_root_vertex(self):
         return self.get_vertex(self.__root_vertex)
@@ -150,6 +162,7 @@ class BehaviourTree(Graph):
         #breadth first search to find distance from root vertex
         visited = set()
         q = queue.Queue()
+        root.set_depth(0)
         q.put(root)
 
         while (not q.empty()):
@@ -160,7 +173,7 @@ class BehaviourTree(Graph):
             for neighbour in connected_vertices:
                 if neighbour.get_key() not in visited:
                     neighbour.set_depth(current_vertex_depth+1)
-                    visited.add(neighbour)
+                    visited.add(neighbour.get_key())
                     q.put(neighbour)
     
     def create_unformatted_networkx_graph(self):
@@ -234,11 +247,150 @@ class BehaviourTree(Graph):
                 if (action_type == actionType.data):
                     self.add_data_edge(from_key,to_key)
         
-    def get_position(self):
+    def get_positions(self):
         raise NotImplementedError("Do not call traverse by BehaviourTree, traverse must be implemented by a child class")
     
         # Set margins for the axes so that nodes aren't clipped
+
+
+
+    #get lines of each 
+def get_lines(graph,positions):
+    #format = [((x1,y1),(x2,y2)),]
+    lines = []
+    for vertex in graph.get_vertices():
+        for neighbour in vertex.get_connections():
+            a = (positions[vertex.get_key()])
+            b = (positions[neighbour.get_key()])
+            coord = (a,b)
+            
+            lines.append( coord )
+
+    return lines
+
+#get cross over lines
+
+def get_crossed_line_count(graph,positions):
+    lines = get_lines(graph,positions)
+    line_count = 0
+    #test intesection with every line for every other line
+    for left_index in range(0,len(lines)):
+        left_line = lines[left_index]
+        for right_index in range(left_index+1,len(lines)):
+            right_line = lines[right_index]
+            lines_intersect = doIntersect(left_line[0][0],left_line[0][1],left_line[1][0],left_line[1][1],\
+                                right_line[0][0],right_line[0][1],right_line[1][0],right_line[1][1])
+            if lines_intersect:
+                print('a1({},{}) a2({},{})\nb1({},{}) b2({},{})'.format(left_line[0][0],left_line[0][1],left_line[1][0],left_line[1][1],\
+                                right_line[0][0],right_line[0][1],right_line[1][0],right_line[1][1]))
+                line_count += int(lines_intersect)
+
+    return line_count
+
+def get_line_lengths(graph,positions):
+    lines = get_lines(graph,positions)
+    line_lengths = []
+    for line in lines:
+        coord1 = line[0]
+        coord2 = line[1]
+        length = math.sqrt(((coord1[0] - coord2[0])**2 + (coord1[1] - coord2[1])**2))
+        line_lengths.append(length)
+
+    return line_lengths
+
+def get_line_length_stdev(graph,positions):
+    line_lengths = get_line_lengths(graph,positions)
+    stat = statistics.stdev(line_lengths)
+    return stat
+
+'''a = [[1, 0], [0, 1]]
+b = [[4, 1], [2, 2]]
+np.dot(a, b)
+array([[4, 1],
+       [2, 2]])'''
+
+# taken https://stackoverflow.com/questions/52516949/angle-between-two-non-intersecting-lines
+
+#dot product
+def get_angle(p1x,p1y,
+                q1x,q1y,
+                p2x,p2y,
+                q2x,q2y):
+    l1 = [(p1x,p1y), (q1x,q1y)]
+    l2 = [(p2x, p2y), (q2x, q2y)]
+
+    seg1 = numpy.array(l1)
+    seg1 = seg1[1] - seg1[0]
+
+    seg2 = numpy.array(l2)
+    seg2 = seg2[1] - seg2[0]
+
+    angle_l1 = numpy.angle(complex(*(seg1)),deg=False)
+    angle_l2 = numpy.angle(complex(*(seg2)),deg=False)
+
+    #result
+    res = angle_l1 - angle_l2
+    res = (res + numpy.pi/2) % numpy.pi - (numpy.pi/2)
+
+    return res
+
+# data lines
+    #get lines of each 
+def get_data_lines(graph,positions):
+    #format = [((x1,y1),(x2,y2)),]
+    lines = []
+    for vertex in graph.get_vertices():
+        for neighbour in vertex.get_data_connections():
+            a = (positions[vertex.get_key()])
+            b = (positions[neighbour.get_key()])
+            coord = (a,b)
         
+            lines.append( coord )
+
+    return lines
+
+def get_control_lines(graph,positions):
+        #format = [((x1,y1),(x2,y2)),]
+    lines = []
+    for vertex in graph.get_vertices():
+        for neighbour in vertex.get_control_connections():
+            a = (positions[vertex.get_key()])
+            b = (positions[neighbour.get_key()])
+            coord = (a,b)
+        
+            lines.append( coord )
+
+    return lines
+    
+    
+
+def get_average_angles(graph,positions):
+    lines = get_lines(graph,positions)
+
+    angles = 0
+    angles_count = 0
+
+    # control = vertical
+    for c in get_control_lines(graph,positions):
+        current_angle = get_angle(c[0][0],c[0][1],
+                                  c[1][0],c[1][1],
+                                  0,0,
+                                  0,1)
+        angles += current_angle
+        angles_count += 1
+
+    #data = horizontal
+    for d in get_data_lines(graph,positions):
+        current_angle = get_angle(d[0][0],d[0][1],
+                                  d[1][0],d[1][1],
+                                  0,0,
+                                  1,0)
+        angles += current_angle
+        angles_count += 1
+
+    return angles/angles_count
+    
+
 
     
 class Circular(BehaviourTree):
@@ -307,7 +459,7 @@ def adjustByRow(position_dict):
         index = 0
         for vertex in current_list:
             x_scaling = float(1/(1 + len(values_list[y_v])))*(1+index)*max_x
-            new_dict[vertex] = (y_v,x_scaling)
+            new_dict[vertex] = (x_scaling,y_v)
             index += 1
 
     return new_dict
@@ -342,7 +494,7 @@ class SimpleRulesV1(BehaviourTree):
         for connection in currControlConnections:
 
             if connection.get_depth() > curr_node.get_depth() and connection.get_key() not in self.positions:
-                print('Node {} Processing {}'.format(curr_node.get_key(),connection.get_key()))
+                #print('Node {} Processing {}'.format(curr_node.get_key(),connection.get_key()))
                 control_connection_passed = 0
                 tmp = self.iterate_through_node(connection,child_rightmost_x,child_bottommost_y+1)
                 child_rightmost_x  = tmp[0] + 1
@@ -352,49 +504,18 @@ class SimpleRulesV1(BehaviourTree):
  
             if connection.get_depth() > curr_node.get_depth() and connection.get_key() not in self.positions:
                 tmp = self.iterate_through_node(connection,child_rightmost_x + 1,child_bottommost_y)
-                print('Node {} Processing {}'.format(curr_node.get_key(),connection.get_key()))
+                #print('Node {} Processing {}'.format(curr_node.get_key(),connection.get_key()))
                 child_rightmost_x  = tmp[0]
         
         return (child_rightmost_x,child_bottommost_y)
-
     def get_position(self):
         self.set_root_vertex_by_key(0)
         self.initialise_depth()
-        self.iterate_through_node(self.get_root_vertex(),0,0)   
-        return flip(adjustByRow(self.positions))
-    
-def onSegment(px,py, qx,qy, rx,ry):
-    if ( (qx < max(px, rx)) and (qx > min(px, rx)) and 
-           (qy < max(py, ry)) and (qy > min(py, ry))):
-        return True
-    return False
-  
-def orientation(px,py, 
-                qx,qy, 
-                rx,ry):
-    # to find the orientation of an ordered triplet (p,q,r)
-    # function returns the following values:
-    # 0 : Collinear points
-    # 1 : Clockwise points
-    # 2 : Counterclockwise
-      
-    # See https://www.geeksforgeeks.org/orientation-3-ordered-points/amp/ 
-    # for details of below formula. 
-      
-    val = ((float(qy) - float(py)) * (float(rx) - float(qx))) - ((float(qx) - float(px)) * (float(ry) - float(qy)))
-    if (val > 0):
-          
-        # Clockwise orientation
-        return 1
-    elif (val < 0):
-          
-        # Counterclockwise orientation
-        return 2
-    else:
-          
-        # Collinear orientation
-        return 0
-  
+        root_v = self.get_root_vertex()
+        self.iterate_through_node(root_v,0,0)        
+        return flip(self.positions)
+
+
 # The main function that returns true if 
 # the line segment 'p1q1' and 'p2q2' intersect.
 #lines go from (p#x,p#y) -> (q#x,q#y)
@@ -402,39 +523,30 @@ def doIntersect(p1x,p1y,
                 q1x,q1y,
                 p2x,p2y,
                 q2x,q2y):
-      
-    # Find the 4 orientations required for 
-    # the general and special cases
-    o1 = orientation(p1x,p1y, q1x,q1y, p2x,p2y)
-    o2 = orientation(p1x,p1y, q1x,q1y, q2x,q2y)
-    o3 = orientation(p2x,p2y, q2x,q2y, p1x,p1y)
-    o4 = orientation(p2x,p2y, q2x,q2y, q1x,q1y)
-  
-    # General case
-    if ((o1 != o2) and (o3 != o4)):
-        return True
-  
-    # Special Cases
-  
-    # p1 , q1 and p2 are collinear and p2 lies on segment p1q1
-    if ((o1 == 0) and onSegment(p1x,p1y, p2x,p2y,q1x,q1y)):
-        return True
-  
-    # p1 , q1 and q2 are collinear and q2 lies on segment p1q1
-    if ((o2 == 0) and onSegment(p1x,p1y, q2x,q2y,q1x,q1y)):
-       return True
-  
-    # p2 , q2 and p1 are collinear and p1 lies on segment p2q2
-    if ((o3 == 0) and  onSegment(p2x,p2y,p1x,p1y,q2x,q2y)):
-        return True
-  
-    # p2 , q2 and q1 are collinear and q1 lies on segment p2q2
-    if ((o4 == 0) and onSegment(p2x,p2y,q1x,q1y,q2x,q2y)):
-        return True
-  
-    # If none of the cases
-    return False
+    p1 = shapely.LineString([shapely.Point(p1x,p1y),shapely.Point(q1x,q1y)])
+    p2 = shapely.LineString([shapely.Point(p2x,p2y),shapely.Point(q2x,q2y)])
+    intersects = (p1.intersects(p2))
+    if (intersects == False):
+        return False
 
+    intersection =(p1.intersection(p2))
+    if type(intersection) is shapely.LineString:
+        print ("Linear Overlap (True)")
+        return True
+    if type(intersection) is shapely.Point:
+        # if either of the points were on each others edges, it doesnt count
+        cond1 = (p1x==p2x and p1y==p2y) # if p1 == q1 
+        cond2 = (p1x==q2x and p1y==q2y)  # if p1 == q2
+        cond3 = (q1x==p2x and q1y==p2y) # if q1 == p2
+        cond4 = (q1x==q2x and q1y==q2y)  # if q1 == q2
+    
+        if cond1 or cond2 or cond3 or cond4:
+            print ("Point Overlap (On edge of line segment) (False)")
+            return False
+        print ("Point Overlap (Not on edge of line segment) (True)")
+        return True
+
+    return ValueError("Error Processing Intersection")
 
 class SimpleRulesV2(BehaviourTree):
     def __init__(self):
@@ -472,16 +584,21 @@ class SimpleRulesV2(BehaviourTree):
                 control_connection_passed = 0
                 tmp = self.iterate_through_node(connection,child_rightmost_x,current_y+1,curr_node)
                 child_rightmost_x  = tmp[0] + 1
+                child_bottommost_y = tmp[1]
 
             
         lenCurrDataConnections = len(currDataConnections)
         if (lenCurrDataConnections == 1 and currDataConnections[0].get_key() not in self.positions):
             self.iterate_through_node(currDataConnections[0],child_rightmost_x+1,current_y,curr_node)
         else:
-            child_bottommost_y += 1
+            
             for connection in currDataConnections:
                 if connection.get_key() not in self.positions:
-                    self.iterate_through_node(connection,child_rightmost_x+1,current_y+1,curr_node)      
+                    
+                    tmp = self.iterate_through_node(connection,child_rightmost_x+1,child_bottommost_y,curr_node)     
+                    child_rightmost_x = tmp[0] 
+                    child_bottommost_y +=1 
+                    #child_bottommost_y = tmp[1]
         return (child_rightmost_x,child_bottommost_y)
 
     def get_position(self):
@@ -489,7 +606,7 @@ class SimpleRulesV2(BehaviourTree):
         self.initialise_depth()
         root_v = self.get_root_vertex()
         self.iterate_through_node(root_v,0,0,root_v)        
-        return flip(adjustByRow(self.positions))
+        return flip(self.positions)
 
 
 class SimpleRulesV3(BehaviourTree):
@@ -570,12 +687,406 @@ class SimpleRulesV3(BehaviourTree):
         return flip(adjustByRow(self.positions))
 
 
+class LevelRankV1(BehaviourTree):
+    def __init__(self):
+        self.positions = {}
+        self.levels = {}
+        super().__init__()
+    
+    def get_levels(self):
+        vertices = self.get_vertices()
+        for vertex in vertices:
+            arr = self.levels.get(vertex.get_depth(),[])
+            
+            arr.append(vertex)
+            self.levels[vertex.get_depth()] = arr
+    
+    def order_levels(self):
+        print (self.levels.items())
+        for level, vertices in self.levels.items():
+            vertex_count = 0
+            for vertex in vertices:
+                self.positions[vertex.get_key()] = (level,vertex_count)
+                vertex_count += 1
+
+    def get_position(self):
+        self.set_root_vertex_by_key(0)
+        self.initialise_depth()
+        self.get_levels()
+        self.order_levels()      
+        return adjustByRow(flip(self.positions))
+    
+
+
+def generate_set_value(origin_vertex, dest_vertex):
+    l = str(min(origin_vertex, dest_vertex))
+    r = str(max(origin_vertex, dest_vertex))
+    return (l + " " + r)
+
+class LevelRankV2(BehaviourTree):
+    def __init__(self):
+        self.positions = {}
+        self.levels = {}
+        self.data_connection_set = set()
+        self.control_connection_set = set()
+        #self.lines = [] #in the format of [a,b] where vertex a is connected to b
+        super().__init__()
+    
+    def get_levels(self):
+        vertices = self.get_vertices()
+        for vertex in vertices:
+            curr_key = vertex.get_key()
+            arr = self.levels.get(vertex.get_depth(),[])
+
+            for data_vertex in vertex.get_data_connections():
+                neighbour_key = data_vertex.get_key()
+                #self.lines.append([curr_key,neighbour_key])
+                self.data_connection_set.add(generate_set_value(curr_key,neighbour_key))
+
+            for control_vertex in vertex.get_control_connections():
+                neighbour_key = control_vertex.get_key()
+                #self.lines.append([curr_key,neighbour_key])
+                self.control_connection_set.add(generate_set_value(curr_key,neighbour_key))
+                
+            arr.append(vertex.get_key())
+            self.levels[vertex.get_depth()] = arr
+        
+    
+
+    #get the x and y coords of nodes from position list
+    # current_level is key value
+    def get_crossover_count(self,current_level,selected_level,
+                            current_level_positions,selected_level_positions):
+        
+        crossover_count = 0
+        lines = [] # stored as 
+        for current_vertex in current_level:
+            current_key = current_vertex
+
+            current_position = current_level_positions[current_key]
+
+            for selected_vertex in selected_level:
+                selected_key = selected_vertex
+
+                selected_position = selected_level_positions[selected_key]
+
+                for line in lines:
+                    #do intersect lines[0],lines[1],current,select
+                    print("line", line)
+                    print("curr", current_position[0],current_position[1],
+                                                  selected_position[0],selected_position[1])
+
+                    is_Intersecting = doIntersect(line[0][0],line[0][1],
+                                                  line[1][0],line[1][1],
+                                                  current_position[0],current_position[1],
+                                                  selected_position[0],selected_position[1])
+                    if is_Intersecting:
+                        crossover_count += 1
+                
+                lines.append([[current_position[0],current_position[1]],[selected_position[0],selected_position[1]]])
+
+        return crossover_count
+    
+    #RANDOM ITERATIONS
+    random_iterations = 5 # can be modified as fit
+
+    #counts the cross over of lines between current one and selected row 
+    # current level = array NOT index
+    # selected level = likewise
+        
+    
+    def order_levels(self):
+        print (self.levels.items())
+        level_items = self.levels.items()
+        for level, vertices in self.levels.items():
+            vertex_count = 0
+            for vertex in vertices:
+                self.positions[vertex] = (level,vertex_count)
+                vertex_count += 1
+
+        first_level = True
+        for level, vertices in level_items:
+            # skip shuffling first layer 
+            if first_level:
+                first_level = False
+                continue
+
+            crossover_count_min = 999
+            current_layout = copy.deepcopy(vertices)
+            current_dict = {}
+            for i in range(0,5):
+                new_layout = copy.deepcopy(vertices)
+                random.shuffle(new_layout)
+                # create a new dictionary for this level
+                new_dict = {}
+                new_vertex_count = 0
+                for n in new_layout:
+                    new_dict[n] = (level,new_vertex_count)
+                    new_vertex_count += 1
+
+                    # get crosovers of this new line and previous line
+                new_arrangement_crossovers = self.get_crossover_count(new_layout,self.levels[level-1],
+                                                                      new_dict,self.positions)
+                # if this arrangement casuses the fewest crossovers
+                if new_arrangement_crossovers < crossover_count_min:
+                    crossover_count_min = new_arrangement_crossovers
+                    current_layout = new_layout
+                    current_dict = new_dict
+
+            # set appropriate variables for found localmin
+            #change dict
+            for k,v in current_dict.items():
+                self.positions[k] = v
+
+            # modify levels placement
+            self.levels[level-1] = current_layout
 
         
 
+    def get_position(self):
+        self.set_root_vertex_by_key(0)
+        self.initialise_depth()
+        self.get_levels()
+        self.order_levels()      
+        return flip(self.positions)
+    
+
+class CombinedRankV1(BehaviourTree):
+    def __init__(self):
+        self.positions = {}
+        self.deepest_y_value = 0
+        self.deepest_x_value = 0
+
+        ##store line draw info here
+        ##each entry is a (p1,p2) vertex pair representing line segment
+        self.line_segments = []
+
+        self.vertex_to_pos = {}
+        
+        self.levels = {}
+        self.data_connection_set = set()
+        self.control_connection_set = set()
+        #self.lines = [] #in the format of [a,b] where vertex a is connected to b
+        super().__init__()
 
 
 
+    def iterate_through_node(self,curr_node,current_x,current_y,previous_node): #crx = curr position of node # returns rightmost x
+        self.positions[curr_node.get_key()] = (current_x,current_y)
+        curr_line_segment = (self.positions[previous_node.get_key()],self.positions[curr_node.get_key()])
+        self.line_segments.append(curr_line_segment)
+        self.deepest_y_value = max(self.deepest_y_value,current_y)
+        self.deepest_x_value = max(self.deepest_x_value,current_x)
+
+        currControlConnections = curr_node.get_control_connections()
+        currDataConnections = curr_node.get_data_connections()
+
+        child_rightmost_x = current_x
+        child_bottommost_y = current_y
+
+        cc = 0
+
+        control_connection_passed = 1
+        data_connection_passed = 0
+        for connection in currControlConnections:
+            if connection.get_key() not in self.positions:
+                #print('Node {} Processing {}'.format(curr_node.get_key(),connection.get_key()))
+                control_connection_passed = 0
+                tmp = self.iterate_through_node(connection,child_rightmost_x,current_y+1,curr_node)
+                child_rightmost_x  = tmp[0] + 1
+            
+        lenCurrDataConnections = len(currDataConnections)
+        if (lenCurrDataConnections == 1 and currDataConnections[0].get_key() not in self.positions):
+            tmp = self.iterate_through_node(currDataConnections[0],child_rightmost_x+1,current_y,curr_node)
+        else:
+            for connection in currDataConnections:
+                if connection.get_key() not in self.positions:
+                    tmp = self.iterate_through_node(connection,child_rightmost_x+1,current_y,curr_node)    
+                    child_rightmost_x = tmp[0]
+                    cc += 1
+
+        self.deepest_y_value =  max(self.deepest_y_value,child_bottommost_y)
+
+        return (child_rightmost_x,child_bottommost_y)
+
+    def get_levels(self):
+
+        for vertex in self.get_vertices():
+            curr_key = vertex.get_key()
+            arr = self.levels.get(self.positions[curr_key][1],[])
+            arr.append(curr_key)
+            self.levels[self.positions[curr_key][1]] = arr
+
+        for i in range(len(self.levels)):
+            row = self.levels[i]
+            row.sort(key=lambda x:self.positions[x][0],reverse=False)
+            cc = 0
+            for vertex in row:
+                print(vertex)
+                self.positions[vertex] = (self.positions[vertex][0],cc)
+                cc += 1
+
+    #get the x and y coords of nodes from position list
+    # current_level is key value
+    def get_crossover_count(self,current_level,selected_level,
+                            current_level_positions,selected_level_positions):
+        
+        crossover_count = 0
+        lines = [] # stored as 
+        for current_vertex in current_level:
+            current_key = current_vertex
+
+            current_position = current_level_positions[current_key]
+
+            for selected_vertex in selected_level:
+                selected_key = selected_vertex
+
+                selected_position = selected_level_positions[selected_key]
+
+                for line in lines:
+                    #do intersect lines[0],lines[1],current,select
+                    print("line", line)
+                    print("curr", current_position[0],current_position[1],
+                                                  selected_position[0],selected_position[1])
+
+                    is_Intersecting = doIntersect(line[0][0],line[0][1],
+                                                  line[1][0],line[1][1],
+                                                  current_position[0],current_position[1],
+                                                  selected_position[0],selected_position[1])
+                    if is_Intersecting:
+                        crossover_count += 1
+                
+                lines.append([[current_position[0],current_position[1]],[selected_position[0],selected_position[1]]])
+
+        return crossover_count
+    
+    #RANDOM ITERATIONS
+    random_iterations = 5 # can be modified as fit
+
+    #counts the cross over of lines between current one and selected row 
+    # current level = array NOT index
+    # selected level = likewise
+        
+    
+    def order_levels(self):
+        print (self.levels.items())
+        level_items = self.levels.items()
+        for level, vertices in self.levels.items():
+            vertex_count = 0
+            for vertex in vertices:
+                self.positions[vertex] = (level,vertex_count)
+                vertex_count += 1
+
+        first_level = True
+        for level, vertices in level_items:
+            # skip shuffling first layer 
+            if first_level:
+                first_level = False
+                continue
+
+            crossover_count_min = 999
+            current_layout = copy.deepcopy(vertices)
+            current_dict = {}
+            for i in range(0,5):
+                new_layout = copy.deepcopy(vertices)
+                random.shuffle(new_layout)
+                # create a new dictionary for this level
+                new_dict = {}
+                new_vertex_count = 0
+                for n in new_layout:
+                    new_dict[n] = (level,new_vertex_count)
+                    new_vertex_count += 1
+
+                    # get crosovers of this new line and previous line
+                new_arrangement_crossovers = self.get_crossover_count(new_layout,self.levels[level-1],
+                                                                      new_dict,self.positions)
+                # if this arrangement casuses the fewest crossovers
+                if new_arrangement_crossovers < crossover_count_min:
+                    crossover_count_min = new_arrangement_crossovers
+                    current_layout = new_layout
+                    current_dict = new_dict
+
+            # set appropriate variables for found localmin
+            #change dict
+            for k,v in current_dict.items():
+                self.positions[k] = v
+
+            # modify levels placement
+            self.levels[level-1] = current_layout
+        
+
+    def get_position(self):
+        self.set_root_vertex_by_key(0)
+        self.initialise_depth()
+        self.iterate_through_node(self.get_root_vertex(),0,0,self.get_root_vertex())        
+        self.get_levels()
+        self.order_levels()      
+        return adjustByRow(flip(self.positions))
+
+
+
+
+class TestGraphIterator(BehaviourTree):
+    def __init__(self):
+        self.deepest_y_value = 0
+        self.deepest_x_value = 0
+
+        ##store line draw info here
+        ##each entry is a (p1,p2) vertex pair representing line segment
+        self.line_segments = []
+
+        self.vertex_count = 0
+        self.position_list = []
+        super().__init__()
+
+
+    def iterate_through_node(self,curr_node,current_x,current_y,previous_node,p): 
+        positions = copy.copy(p)
+        positions[curr_node.get_key()] = (current_x,current_y)
+        if (len(positions) >= self.vertex_count):
+            self.position_list.append(positions)
+        curr_line_segment = (positions[previous_node.get_key()],positions[curr_node.get_key()])
+        self.line_segments.append(curr_line_segment)
+        self.deepest_y_value = max(self.deepest_y_value,current_y)
+        self.deepest_x_value = max(self.deepest_x_value,current_x)
+
+        currControlConnections = curr_node.get_control_connections()
+        currDataConnections = curr_node.get_data_connections()
+
+        child_rightmost_x = current_x
+        child_bottommost_y = current_y
+
+        control_connection_passed = 1
+        data_connection_passed = 0
+
+
+        for connection in currControlConnections:
+
+            if connection.get_key() not in positions:
+                #print('Node {} Processing {}'.format(curr_node.get_key(),connection.get_key()))
+                control_connection_passed = 0
+                tmp = self.iterate_through_node(connection,child_rightmost_x,current_y+1,curr_node,positions)
+                child_rightmost_x  = tmp[0] + 1
+
+            
+        lenCurrDataConnections = len(currDataConnections)
+        if (lenCurrDataConnections == 1 and currDataConnections[0].get_key() not in positions):
+            self.iterate_through_node(currDataConnections[0],child_rightmost_x+1,current_y,curr_node,positions)
+        else:
+            child_bottommost_y += 1
+            for connection in currDataConnections:
+                if connection.get_key() not in positions:
+                    self.iterate_through_node(connection,child_rightmost_x+1,current_y+1,curr_node,positions)      
+        return (child_rightmost_x,child_bottommost_y)
+
+    def get_position(self):
+        self.vertex_count = len(self.get_vertices())
+        self.set_root_vertex_by_key(0)
+        self.initialise_depth()
+        root_v = self.get_root_vertex()
+        self.iterate_through_node(root_v,0,0,root_v,{})        
+        return self.position_list
+    
 
 
 
